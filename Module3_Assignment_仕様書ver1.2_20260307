@@ -1,0 +1,406 @@
+# 📘 Obby開発仕様書（Module3課題）
+
+---
+
+## 1. プロジェクト概要
+
+### 1.1 プロジェクト名
+
+**Module3_Assignment**
+
+---
+
+### 1.2 目的
+
+プレイヤーが順番に各エリアを攻略しながらスキルを習得できる、
+安全設計かつ難易度設計が明確な本格Obbyを制作する。
+
+---
+
+### 1.3 設計コンセプト
+
+* 段階的難易度上昇
+* 理不尽を排除
+* 視覚的に分かりやすい
+* スクリプトによるギミック制御
+* 安定動作（物理暴走防止）
+
+---
+
+# 2. 全体構成
+
+```
+Start（砂漠の田舎町）
+ ↓
+初級エリア（海の上）※落下：海で溺死
+ ↓
+チェックポイント①
+ ↓
+中級エリア（海の上）※落下：海で溺死
+ ↓
+チェックポイント②
+ ↓
+死亡パーツエリア（洞窟）※トラップ：ガス罠、地雷、敵NPC
+ ↓
+チェックポイント③
+ ↓
+単純移動エリア（旧遺跡）
+ ↓
+チェックポイント④
+ ↓
+高ジャンプエリア（機械仕掛けの遺跡）※落下：高所からの落下死
+ ↓
+Goal（古代遺跡）
+```
+
+---
+
+# 3. 共通技術仕様
+
+## 3.1 サービス構成
+
+| 用途          | 配置場所                      |
+| ----------- | ------------------------- |
+| ギミックスクリプト   | ServerScriptService       |
+| パーツ制御Script | 各Part内（Server Script）     |
+| 共通モジュール     | ReplicatedStorage/Modules |
+| UI関連        | StarterGui                |
+
+---
+
+## 3.2 セキュリティ設計
+
+* すべてのギミックは **Server Scriptで制御**
+* クライアントに判定を任せない
+* Humanoid取得時は必ず検証
+* Debounce処理を必須とする
+
+---
+
+## 3.3 パフォーマンス設計
+
+* Touchedイベントは無制限接続禁止
+* 無限ループはRunService.Heartbeat使用禁止
+* BodyVelocityは短時間使用のみ
+* moving platformはCFrame Tween推奨
+
+---
+
+# 4. 各エリア仕様
+
+---
+
+# 4.1 全体
+
+# 4.1.1 チェックポイント
+
+## ■ 目的
+
+プレイヤーのリスポーン位置更新
+
+---
+
+## ■ 仕様
+
+・各チェックポイント通過時にリスポーン位置更新
+・リスポーンポイント更新時、エフェクトとサウンドで通知
+
+## ■ 実装方針
+
+### ✔ 推奨方式
+
+`Player.RespawnLocation` を使用
+
+## ■ 設計理由
+
+* Server側でRespawnLocation変更 → 改ざん不可
+* Debounceで多重実行防止
+* GetPlayerFromCharacterで安全取得
+
+---
+
+## ■ セキュリティ注意
+
+❌ LocalScriptでやらない
+❌ Humanoidを直接信用しない
+❌ nilチェックを省略しない
+
+---
+
+# 4.1.2 海
+
+## ■ 目的
+
+プレイヤーの死亡
+
+---
+
+## ■ 仕様
+
+・海に接触して頭（顔）の位置が水面より下に来たら溺死する
+・溺死したら、溺死アニメーションとサウンドで通知し、リスポーンポイントで復活
+
+---
+
+# 4.1.3 高所落下
+
+## ■ 目的
+
+プレイヤーの死亡
+
+---
+
+## ■ 仕様
+
+・地面に当たった時の衝撃（落下速度）を判定し、速度50を超えていたらダメージで死亡
+・落下死したら、バラバラアニメーションとサウンドで通知し、リスポーンポイントで復活
+
+---
+
+# 4.2 初級エリア
+
+## ■ 設計目標
+
+* 初心者30秒以内クリア
+* 足場サイズ：8×8以上
+* 間隔：4〜6 studs
+
+---
+
+## ■ コース仕様
+
+* サイズ：（12, 1, 12）のブロックパーツ
+* 間隔：X軸2studs、Y軸3studs
+* 使用パーツ：ブロックパーツ4個 + チェックポイント①1個
+* プレイヤーがコースアウトして落下した場合、4.1.2 海 の仕様で死亡する
+
+### 構成
+
+EasyCheckPoint（part）
+↑
+EasyFloorBlock4（part）
+↑
+EasyFloorBlock3（part）
+↑
+EasyFloorBlock2（part）
+↑
+EasyFloorBlock1（part）
+↑
+スタート
+
+---
+
+# 4.3 中級エリア
+
+## ■ 追加ギミック
+
+### ① 動く足場上下
+
+推奨：TweenService使用
+
+理由：
+
+* BodyPositionは物理暴走リスクあり
+* Tweenは安定・軽量
+
+---
+
+### ② 動く足場スライド
+
+推奨：TweenService使用
+
+理由：
+
+* BodyPositionは物理暴走リスクあり
+* Tweenは安定・軽量
+
+---
+
+## ■ 設計理由
+
+* 速度一定
+* 永久ループ
+* 物理依存しない
+
+---
+
+## ■ 危険性
+
+⚠ 速すぎると乗れない
+⚠ Anchored = true 必須
+
+---
+
+### 構成
+                                          NormalCheckPoint（part）
+                                     ↑                                           ↑
+UpDownFloorBlock4（part）                                             SlideFloorBlock6（part）←SlideFloorBlock5（part）
+    ↑                                                                                       ↓                                  ↑
+UpDownFloorBlock3（part）                                             SlideFloorBlock7（part）   SlideFloorBlock4（part）
+    ↑                                                                                       ↓                                  ↑
+UpDownFloorBlock2（part）                                             SlideFloorBlock8（part）   SlideFloorBlock3（part）
+    ↑                                                                                       ↓                                  ↑
+UpDownFloorBlock1（part）←NormalFloorBlock2（part）→  SlideFloorBlock1（part）→SlideFloorBlock2（part）
+                                                         ↑
+                                          NormalFloorBlock1（part）
+                                                         ↑
+                                          EasyCheckPoint（part）
+
+## ■ コース仕様
+
+### ○ 固定足場エリア
+
+* サイズ：（6, 1, 6）のブロックパーツ
+* 間隔：X軸6studs
+* 使用パーツ：ブロックパーツ2個（NormalFloorBlock1（part）、NormalFloorBlock2（part））、チェックポイント②1個（NormalCheckPoint（part））
+* プレイヤーがコースアウトして落下した場合、4.1.2 海 の仕様で死亡する
+
+### ① 動く足場上下エリア
+
+* サイズ：（6, 1, 6）のブロックパーツ
+* 間隔：X軸6studs、Y軸12studs
+* 使用パーツ：ブロックパーツ4個（UpDownFloorBlock1（part）、UpDownFloorBlock2（part）、UpDownFloorBlock3（part）、UpDownFloorBlock4（part））
+* プレイヤーがコースアウトして落下した場合、4.1.2 海 の仕様で死亡する
+
+### ② 動く足場スライドエリア
+
+* サイズ：（6, 1, 6）のブロックパーツ
+* 間隔：X軸6studs、Y軸12studs
+* 使用パーツ：ブロックパーツ8個（SlideFloorBlock1（part）、SlideFloorBlock2（part）、SlideFloorBlock3（part）、SlideFloorBlock4（part）、SlideFloorBlock5（part）、SlideFloorBlock6（part）、SlideFloorBlock7（part）、SlideFloorBlock8（part））
+* プレイヤーがコースアウトして落下した場合、4.1.2 海 の仕様で死亡する
+
+---
+
+# 4.4 死亡パーツエリア
+
+### 必ず `Humanoid.Health = 0`
+
+理由：
+BreakJointsは非推奨（将来仕様変更リスク）
+
+---
+
+## ■ コース仕様
+
+* コースは地形を利用する
+* エリアパーツ：宝箱、鍵、扉
+* 即死パーツ：ガス罠、地雷
+* プレイヤーがガス罠に接触した場合、4.1.2 海 の仕様で死亡する
+* プレイヤーが地雷に接触した場合、4.1.3 高所落下の仕様で死亡する
+* 扉を開いた先にチェックポイント③1個（KillPartStageCheckPoint（part））設置
+
+## ■ 追加ギミック
+
+### 宝箱
+
+* クリックすると開く
+* 開いたら閉じない
+* 1回目に開いたときに鍵をスロットに追加する
+
+### 扉
+
+* 鍵を持っていない場合、扉に近づきクリックしても扉は閉じたまま
+* 鍵を持っている場合、扉に近づきクリックしたら扉が開く
+* 開いたら閉じない
+
+---
+
+# 4.5 強制移動＋高ジャンプエリア
+
+## ■ 推奨方式
+
+* 強制移動：LinearVelocity使用（BodyVelocityは非推奨）
+* 高ジャンプ：JumpPower一時変更方式
+
+---
+
+## ■ 設計理由
+
+* 一定方向制御
+* 速度固定
+* 一時付与で暴走防止
+
+---
+
+## ■ セキュリティ
+
+⚠ 無限付与禁止
+⚠ Destroy忘れ禁止
+
+## ■ 潜在的問題
+
+⚠ 重複踏みで上書きバグ
+⚠ 死亡時リセット考慮必要
+
+→ 発展版では状態管理モジュール推奨
+
+---
+
+## ■ コース仕様
+
+### 構成
+VentBase2（part）                  →MoveBlock2（part）                  →VentBase3（part）
+               ↑                                                                                              ↓
+MoveBlock1（part）                                                                        MoveBlock3（part）
+               ↑                                                                                              ↓
+VentBase1（part）                    MoveBlock4（part）←                    VentBase4（part）
+               ↑                                              ↓
+KillPartStageCheckPoint（part）      UpDownPart（part）
+                                                                ↓
+                                                              Goal
+
+### ① 強制移動
+
+* サイズ：（10, 1, 20）のブロックパーツ
+* 間隔：X軸6studs、Y軸12studs
+* 使用パーツ：強制移動ブロックパーツ4個（MoveBlock1（part）、MoveBlock2（part）、MoveBlock3（part）、MoveBlock4（part））
+* プレイヤーがコースアウトして落下した場合、4.1.3 高所落下の仕様で死亡する
+
+### ② 高ジャンプ
+
+* サイズ：（6, 1, 6）のブロックパーツ
+* 間隔：X軸6studs、Y軸12studs
+* 使用パーツ：高ジャンプブロックパーツ4個（VentBase1（part）、VentBase2（part）、VentBase3（part）、VentBase4（part））
+* プレイヤーがコースアウトして落下した場合、4.1.3 高所落下の仕様で死亡する
+
+### ③ 上下移動
+
+* サイズ：（12, 1, 12）のブロックパーツ
+* 使用パーツ：上下移動ブロックパーツ（UpDownPart）
+* プレイヤーがコースアウトして落下した場合、4.1.3 高所落下の仕様で死亡する
+
+---
+
+# 5. 難易度設計基準
+
+| エリア   | 失敗率目安 |
+| ----- | ----- |
+| 初級    | 10%以下 |
+| 中級    | 30%前後 |
+| 強制移動  | 20%   |
+| 高ジャンプ | 25%   |
+
+---
+
+# 6. 品質チェックリスト
+
+✔ Respawnが正しく更新される
+✔ すべてServerScript実装
+✔ nilチェックあり
+✔ Debounceあり
+✔ 物理暴走なし
+✔ 理不尽なし
+✔ 視覚的フィードバックあり
+
+---
+
+# 7. 今後の発展設計（上級者向け）
+
+* ステージ管理モジュール化
+* 進行状況DataStore保存
+* UIステージ表示
+* タイムアタックランキング
+* RemoteEventによる演出同期
+
+---
+
