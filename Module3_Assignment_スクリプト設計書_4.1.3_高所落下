@@ -1,0 +1,32 @@
+﻿【仕様書「4.1.3 高所落下」との対応】
+
+○仕様書に記載されていた要件
+｜要件｜対応｜
+｜地面に当たった時の衝撃（落下速度）を判定し、速度50を超えていたら死亡｜AssemblyLinearVelocity.Y の符号反転で落下速度を取得し閾値判定｜
+｜バラバラアニメーションとサウンドで通知｜BreakJointsOnDeath=true（デフォルト）のまま Health=0 → Roblox標準バラバラ演出 / 衝撃サウンド再生｜
+｜リスポーンポイントで復活｜CheckpointHandler が担当　※4.1.1_チェックポイント｜
+
+○仕様書に記載はないが追加で考慮した点
+｜要件｜対応｜
+｜速度閾値を50 → 70に変更｜NormalエリアのUpDownFloor（12studs落差）で誤発動したため調整。54studs/s で死亡確認、70に設定｜
+｜groundPart引数を廃止｜workspace.Ground を Studio に配置する必要をなくし、PlayerAdded/CharacterAdded + rootPart.Touched で全地形対応｜
+｜キャラクター自身のパーツを除外｜hit:IsDescendantOf(character) で自分の足や腕への Touched を無視｜
+｜debounce をキャラクターごとのローカルフラグで管理｜CharacterAdded ごとに setupCharacter を呼び出し、ローカル変数 debounced=false から再開。リスポーン後に自動リセット｜
+｜バラバラ演出に透明化なし｜SeaDeathHandler は「透明化してバラバラを隠す」仕様。高所落下は逆に「バラバラを見せる」ためBreakJointsOnDeathをデフォルトのまま使用｜
+
+○関連するモジュール
+FallDeathHandler.luau  <- 高所落下死判定（サーバー）
+
+○依存関係：
+init.server.luau
+  └─ require(FallDeathHandler).init()
+        ├─ Players.PlayerAdded → player.CharacterAdded → setupCharacter
+        └─ rootPart.Touched（閾値判定 → サウンド再生 → Health=0）
+
+直接依存：
+｜モジュール｜依存先｜
+｜FallDeathHandler.luau｜Players｜
+
+間接依存（正しく動作するために必要）：
+｜機能｜依存モジュール｜
+｜リスポーン位置｜CheckpointHandler｜

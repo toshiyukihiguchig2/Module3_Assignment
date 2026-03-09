@@ -1,0 +1,58 @@
+【仕様書「4.3 中級エリア」との対応】
+
+○仕様書に記載されていた要件
+｜要件｜対応｜
+｜動く足場上下：TweenService推奨｜TweenService + EasingStyle.Linear で等速実装｜
+｜動く足場スライド：TweenService推奨｜TweenService でカルーセル運動実装｜
+｜速度一定｜SPEED（studs/秒）から距離に応じてTween時間を自動計算｜
+｜永久ループ｜UpDown：RepeatCount=-1, Reverses=true / Slide：Completedで再帰呼び出し｜
+｜物理依存しない｜BodyPositionは不使用、TweenServiceで完結｜
+｜Anchored = true 必須｜assert(block.Anchored) で起動時に検証｜
+｜コースアウト落下 → 海で溺死｜SeaDeathHandler が担当　※4.1.2 _海｜
+｜チェックポイント通過 → リスポーン更新｜CheckpointHandler が担当　※4.1.1_チェックポイント｜
+
+○仕様書に記載はないが追加で考慮した点
+｜要件｜対応｜
+｜UpDown：初動方向の制御｜Block1/3は下、Block2/4は上から開始。direction引数（1/-1）で制御｜
+｜Slide：カルーセル設計｜「次のブロックの位置に到達したら、そのブロックが移動した先へ」を1→2→...→8→1の循環で実現｜
+｜Slide：プレイヤー追従の段階的改善｜サーバーCFrame更新（カクつき）→ AssemblyLinearVelocity（追従しない）→ クライアントCFrame delta加算（最終解）｜
+｜Slide：ネットワーク遅延ゼロ｜CollectionServiceタグでブロックを識別し、クライアント側で直接Touched検知。RemoteEvent不使用｜
+｜Slide：Studio側の摩擦設定｜CustomPhysicalProperties.Friction = 2 をStudio側で設定することで補完｜
+
+○関連するモジュール
+UpDownFloor.luau       ← 上下移動（サーバー）
+SlideFloor.luau        ← カルーセル移動（サーバー）
+init.client.luau       ← SlideFloor追従 + SeaDeath アニメーション（クライアント）
+SeaDeathHandler.luau   ← コースアウト落下時の溺死
+CheckpointHandler.luau ← NormalCheckPoint通過時のリスポーン更新
+
+○依存関係：
+init.server.luau
+  ├─ require(UpDownFloor).init(Block1,3 / Block2,4)
+  │     └─ TweenService（外部サービス）
+  │
+  └─ require(SlideFloor).init(Block1〜8)
+        ├─ TweenService（外部サービス）
+        └─ CollectionService（タグ付与 → クライアントへ情報提供）
+               ↓
+        init.client.luau
+              ├─ CollectionService:GetTagged("SlideFloor") でブロック取得
+              ├─ block.Touched / block.TouchEnded（ブロック乗降検知）
+              └─ RunService.Heartbeat（CFrame delta加算）
+
+SeaDeathHandler（間接依存）
+  └─ NormalAreaのコースアウト落下 → Swimming検知 → 溺死
+
+CheckpointHandler（間接依存）
+  └─ NormalCheckPoint通過 → savedCFrames更新 → 死亡後テレポート
+
+直接依存：
+｜モジュール｜依存先｜
+｜UpDownFloor.luau｜TweenService｜
+｜SlideFloor.luau｜TweenService、CollectionService｜
+｜init.client.luau｜CollectionService、RunService、ReplicatedStorage（SeaDeath用）｜
+
+間接依存（NormalAreaが正しく動作するために必要）：
+｜機能｜依存モジュール｜
+｜落下死｜SeaDeathHandler｜
+｜リスポーン位置｜CheckpointHandler｜

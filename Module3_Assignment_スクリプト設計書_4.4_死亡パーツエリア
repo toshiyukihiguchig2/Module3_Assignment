@@ -1,0 +1,61 @@
+﻿【仕様書「4.4 死亡パーツエリア」との対応】
+
+○仕様書に記載されていた要件
+｜要件｜対応｜
+｜死亡処理は必ず Humanoid.Health = 0｜GasTrap: humanoid.Health = 0 / Mine: in-model Script が Health = 0｜
+｜宝箱クリックで開く｜宝箱の in-model Script（Studio）: ClickDetector.MouseClick で蓋アニメーション｜
+｜宝箱は開いたら閉じない｜lidOpen フラグで一方向制御｜
+｜宝箱を開けたら鍵をスロットに追加｜lever:SetAttribute(Unlocked, true) → TreasureChest が ProximityPrompt 有効化｜
+｜罠スイッチなし → 即死パーツがスタンバイ｜HasTrapSwitch 属性がない場合のみ GasTrap が検知・発動｜
+｜スタンバイ中、4studs以内で即死パーツ起動｜GasTrap: RunService.Heartbeat で 4studs 検知 → triggerGasDeath 発動｜
+｜罠スイッチ所持 → 即死パーツ停止｜player:GetAttribute(HasTrapSwitch) が true なら continue でスキップ｜
+｜ガス罠接触 → 4.1.2 海 の仕様で溺死｜SeaDeathAnim RemoteEvent 送信 + 透明化 + Health = 0｜
+｜地雷接触 → 4.1.3 高所落下の仕様で死亡｜Anchored OFF → 落下 → in-model Script が爆発・吹き飛び・死亡処理｜
+｜チェックポイント③（KillPartStageCheckPoint）設置｜CheckpointHandler が担当　※4.1.1_チェックポイント｜
+
+○仕様書に記載はないが追加で考慮した点
+｜要件｜対応｜
+｜地雷の起動距離：仕様書は4studs → 20studsに変更｜踏んだ瞬間ではなく「近づいたら落ちてくる」演出にするため距離を拡大｜
+｜罠スイッチ取得UIをProximityPromptで実装｜「E」キー1秒長押し（HoldDuration=1.0）でインタラクション。宝箱を開けるまで非表示（Enabled=false）｜
+｜宝箱→leverの連携をRemoteEvent不使用で実現｜lever:SetAttribute(Unlocked, true) + GetAttributeChangedSignal で疎結合連携｜
+｜罠無効化の視覚フィードバック｜Gas.Chimeny.Union と Gas.redblob.Body の色を赤(151,0,0) → 青(0,0,151) に変更｜
+｜ガス発生の視覚的スタンバイ表現｜ChimneySmoke（Smoke）常時 Enabled=true。無効化時に Smoke.Enabled=false｜
+｜爆発処理の責任分離｜Rojo管理の Mine.luau は「Anchored OFF」のみ担当。爆発・ダメージは in-model Script が担当｜
+｜GasTrap debounce管理｜CharacterAdded 時にリセット。二重発動を防止｜
+｜ProximityPrompt配置先の再帰探索｜leverModel.PrimaryPart または FindFirstChildWhichIsA(BasePart, true) でサブモデル内 Part を自動発見｜
+
+○関連するモジュール
+GasTrap.luau         <- ガス罠（4studs近接検知 → 溺死処理）（サーバー）
+Mine.luau            <- 地雷（20studs近接検知 → Anchored OFF）（サーバー）
+TreasureChest.luau   <- 罠スイッチ取得（ProximityPrompt管理）（サーバー）
+宝箱 in-model Script <- 蓋アニメーション + Unlocked属性付与（Studio直接実装・Rojo管理外）
+init.client.luau     <- SeaDeathAnim受信 → 溺死アニメーション再生（クライアント）
+
+○依存関係：
+init.server.luau
+  ├─ require(GasTrap).init({Gas})
+  │     ├─ RunService.Heartbeat（4studs近接ループ）
+  │     ├─ Players.PlayerAdded / CharacterAdded（debounceリセット）
+  │     └─ ReplicatedStorage.SeaDeathAnim（溺死演出FireClient）
+  │            ↓
+  │     init.client.luau（溺死アニメーション再生）
+  │
+  ├─ require(Mine).init({Grenade1, Grenade2, Grenade3})
+  │     └─ RunService.Heartbeat（20studs近接ループ → Anchored=false → 切断）
+  │            ↓
+  │     Grenade1〜3 の in-model Script（爆発・吹き飛び・Health=0・削除）
+  │
+  └─ require(TreasureChest).init(lever, ChimneySmoke.ChimneySmoke)
+        ├─ leverModel:GetAttributeChangedSignal(Unlocked)（宝箱 in-model Script が発火）
+        └─ ProximityPrompt.Triggered（E 1秒長押し → HasTrapSwitch付与・Smoke停止・色変更・lever削除）
+
+直接依存：
+｜モジュール｜依存先｜
+｜GasTrap.luau｜RunService、Players、ReplicatedStorage（SeaDeathAnim）｜
+｜Mine.luau｜RunService、Players｜
+｜TreasureChest.luau｜（外部サービス依存なし。引数のインスタンスのみ）｜
+
+間接依存（KillPartAreaが正しく動作するために必要）：
+｜機能｜依存モジュール｜
+｜溺死演出（GasTrap）｜init.client.luau（SeaDeathAnim受信）｜
+｜チェックポイント③｜CheckpointHandler｜

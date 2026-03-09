@@ -1,0 +1,43 @@
+【仕様書「4.1.1 チェックポイント」との対応】
+
+○仕様書に記載されていた要件
+｜要件｜対応｜
+｜各チェックポイント通過時にリスポーン位置更新｜CFrameを保存し CharacterAdded でテレポート｜
+｜チェックポイントエフェクト｜なし ※パーツ自体が魔法陣デカールにしている。仕様変更により削除した。｜
+｜チェックポイントサウンド｜チェックポイントPartに Sound を配置して再生｜
+｜Server側で制御｜ServerScriptService のスクリプトで完結｜
+｜Debounce｜同一チェックポイントを1プレイヤーが何度通過しても1回のみ処理｜
+｜GetPlayerFromCharacter｜hit.Parent から安全にプレイヤー取得｜
+チェックポイント：サウンド：111748858669996
+
+○仕様書に記載はないが追加で考慮した点
+｜要件｜対応｜
+｜Player.RespawnLocation の制約回避｜SpawnLocationは初期スポーン対象になる・Workspace外では機能しない問題をCFrame保存＋テレポート方式で解決｜
+｜チェックポイントの順序制御なし（意図的）｜後ろのチェックポイントに先に触れても保存される。仕様書に順序制約の記載がないため｜
+｜既入室プレイヤー対応｜GetPlayers() でサーバー起動前に入室済みのプレイヤーにも適用｜
+｜スポーン高さオフセット｜SPAWN_OFFSET = Vector3.new(0, 4, 0) でパーツに埋まらないよう調整　※初期配置のSpawnLocationは地形に埋めているため｜
+｜プレイヤー退室時のメモリリーク防止｜PlayerRemoving で savedCFrames と activated を削除｜
+
+○フォルダ構成　※チェックポイント関連
+Workspace
+├EasyStage（folder）
+│└EasyCheckPoint（part）
+├NormalStage（folder）
+│└NormalCheckPoint
+├KillPartStage（folder）
+│└KillPartStageCheckPoint（part）
+├JumpStage（folder）
+├Lobby（folder）
+└SpawnLocation（SpawnLocation）
+
+○関連するモジュール
+CheckpointHandler.luau   ← チェックポイント通過検知・CFrame保存・テレポート（サーバー）
+SeaDeathHandler.luau     ← 死亡処理（チェックポイントが有効でないと Lobby に戻る）
+FallDeathHandler.luau    ← 同上（未実装）
+
+○依存関係：
+CheckpointHandler（CFrame保存）
+        ↓
+死亡イベント（SeaDeath / FallDeath）
+        ↓
+CharacterAdded 発火 → 保存済みCFrameへテレポート

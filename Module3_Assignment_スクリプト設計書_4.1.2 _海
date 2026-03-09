@@ -1,0 +1,34 @@
+【仕様書「4.1.2 海」との対応】
+
+○仕様書に記載されていた要件
+｜要件｜対応｜
+｜頭が水面より下で溺死｜Terrain:ReadVoxels() で頭voxelが水かを判定｜
+｜溺死アニメーション｜RemoteEvent → クライアントで Priority.Action4 再生｜
+｜溺死サウンド｜サーバーから Sound を生成・再生（自動レプリケート）｜
+｜リスポーンポイントで復活｜humanoid.Health = 0 → Robloxが Player.RespawnLocation を参照して自動復活｜
+溺死：アニメーション：77831000639022
+溺死：サウンド：120043778768093
+
+○仕様書に記載はないが追加で考慮した点
+｜項目｜内容｜
+｜Terrain対応｜TouchedはTerrainに発火しないため Humanoid.StateChanged + ReadVoxels を採用｜
+｜Debounce｜StateChanged が短時間に複数回発火しても溺死処理が重複しないよう制御｜
+｜既入室プレイヤー対応｜Players:GetPlayers() でサーバー起動前に入室済みのプレイヤーにも適用｜
+｜デフォルト死亡アニメーション抑制｜BreakJointsOnDeath = false + キャラクター透明化でバラバラ表示を防止｜
+｜Decal（顔）の透明化｜BasePart だけでなく Decal も透明化対象に含める｜
+｜pcall保護｜ReadVoxels のエラーを pcall で安全に処理｜
+｜アニメーションのサーバーレプリケート問題｜サーバー側 Animator:LoadAnimation の非信頼性を考慮しRemoteEventでクライアントに委譲｜
+
+○関連するモジュール
+SeaDeathHandler.luau     ← 溺死判定・死亡処理（サーバー）
+init.client.luau         ← 溺死アニメーション再生（クライアント）
+CheckpointHandler.luau   ← Player.RespawnLocation を更新（リスポーン位置の根拠）
+
+○連携の流れ
+CheckpointHandler  →  Player.RespawnLocation を更新
+                              ↓（事前に設定済み）
+SeaDeathHandler    →  humanoid.Health = 0
+                              ↓
+              Robloxが RespawnLocation でリスポーン
+                              ↓
+init.client.luau   →  RemoteEventでアニメーション再生
